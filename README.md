@@ -1,5 +1,5 @@
 Для доступа к 3,4,5 методам необходимо получить токен    
-Коллекция 
+Документация 
 <a href =https://documenter.getpostman.com/view/40913826/2sAYQfEVAt >Postman</a>
 1. POST
 Registration
