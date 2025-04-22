@@ -2,7 +2,7 @@
 
 Современный RESTful API для блог-платформы, построенный на Laravel с использованием передовых практик и технологий.
 
-![Laravel](https://img.shields.io/badge/Laravel-10.x-red.svg)
+![Laravel](https://img.shields.io/badge/Laravel-11.x-red.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.2-blue.svg)
 ![Redis](https://img.shields.io/badge/Redis-latest-red.svg)
 ![JWT](https://img.shields.io/badge/JWT-Auth-green.svg)
@@ -16,15 +16,14 @@
 - 📊 Пагинация результатов
 - 💾 Кеширование с использованием Redis
 - 🔄 Автоматическая инвалидация кеша
-- ✅ Полное покрытие тестами
+- ✅ покрытие тестами
 
 ## 📋 Требования
 
 - PHP >= 8.2
 - Composer
-- MySQL >= 8.0
 - Redis >= 6.0
-- Laravel 10.x
+- Laravel 11.x
 
 ## 🛠 Установка
 
