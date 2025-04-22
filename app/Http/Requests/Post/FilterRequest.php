@@ -22,13 +22,8 @@ class FilterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => '',
-            'content' => '',
-            'image' => '',
-            'category_id' => '',
-            'tags' => '',
-            'page' => '',
-            'per_page' => '',
+            'page' => 'nullable|integer|min:1',
+            'perPage' => 'nullable|integer|min:1|max:100',
         ];
     }
 }

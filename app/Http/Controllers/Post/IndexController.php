@@ -5,25 +5,38 @@ namespace App\Http\Controllers\Post;
 use App\Http\Filters\PostFilter;
 use App\Http\Requests\Post\FilterRequest;
 use App\Http\Resources\Post\PostResource;
-use App\Models\Post;
+use App\Repositories\Eloquent\PostRepository;
+use Illuminate\Http\JsonResponse;
 
 class IndexController extends BaseController
 {
-    public function __invoke(FilterRequest $request)
+    public function __construct(
+        private readonly PostRepository $postRepository
+    ) {
+    }
+
+    public function __invoke(FilterRequest $request): JsonResponse
     {
         $data = $request->validated();
 
         $page = $data['page'] ?? 1;
-
         $perPage = $data['perPage'] ?? 10;
 
-        $filter = app()->make(PostFilter::class,['queryParams' => array_filter($data)]);
+        $filter = app()->make(PostFilter::class, ['queryParams' => array_filter($data)]);
 
-        $posts = Post::filter($filter)->paginate($perPage, ['*'], 'page', $page);
+        $posts = $this->postRepository->getPaginated($perPage, $page);
 
-        return PostResource::collection($posts);
+        $postsData = PostResource::collection($posts->items())->toArray($request);
 
-        //return view('post.index', compact('posts'));
+        return response()->json([
+            'data' => $postsData,
+            'meta' => [
+                'current_page' => $posts->currentPage(),
+                'per_page' => $posts->perPage(),
+                'total' => $posts->total()
+            ]
+        ]);
     }
 }
 
+                

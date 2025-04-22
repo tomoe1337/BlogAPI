@@ -26,7 +26,27 @@ class PostFactory extends Factory
             'image' => $this->faker->imageUrl(),
             'likes' => random_int(1,2000),
             'is_published' => 1,
-            'category_id' => Category::get()->random()->id,
+            'category_id' => Category::factory(),
         ];
+    }
+
+    /**
+     * Указывает, что пост не опубликован
+     */
+    public function unpublished(): self
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_published' => 0,
+        ]);
+    }
+
+    /**
+     * Указывает, что у поста нет категории
+     */
+    public function withoutCategory(): self
+    {
+        return $this->state(fn (array $attributes) => [
+            'category_id' => null,
+        ]);
     }
 }

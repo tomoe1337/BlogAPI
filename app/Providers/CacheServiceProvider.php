@@ -6,21 +6,15 @@ use App\Contracts\CacheInterface;
 use App\Services\Cache\RedisCacheService;
 use Illuminate\Support\ServiceProvider;
 
-class AppServiceProvider extends ServiceProvider
+class CacheServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
         $this->app->bind(CacheInterface::class, RedisCacheService::class);
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
         //
     }
-}
+} 

@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Redis;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -31,4 +32,15 @@ Route::group(['namespace' => 'App\Http\Controllers\Post', 'middleware' => 'jwt.a
 
     Route::delete('/posts/{post}', DestroyController::class);
 
+});
+
+Route::get('/test-redis', function () {
+    try {
+        Redis::set('test', 'test');
+        $value = Redis::get('test');
+        Redis::del('test');
+        return response()->json(['success' => true, 'value' => $value]);
+    } catch (\Exception $e) {
+        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+    }
 });

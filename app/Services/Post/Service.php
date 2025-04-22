@@ -5,107 +5,209 @@ namespace App\Services\Post;
 use App\Models\Category;
 use App\Models\Post;
 use App\Models\Tag;
-use App\Models\User;
+use App\Repositories\Eloquent\PostRepository;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class Service
 {
-    public function store($data)
+    public function __construct(
+        private PostRepository $repository
+    ) {}
+
+    /**
+     * Создает новый пост
+     *
+     * @param array $data
+     * @return Post
+     * @throws \Exception
+     */
+    public function store(array $data): Post
     {
+        $this->validate($data);
+
         try {
             DB::beginTransaction();
-            $tags = $data['tags'];
-            $category = $data['category'];
 
-            unset($data['tags'], $data['category']);
+            $categoryId = $this->getCategoryIdWithUpdate($data['category'] ?? []);
+            $tagIds = $this->getTagIdsWithUpdate($data['tags'] ?? []);
 
-            $data['category_id'] = $this->getCategoryId($category);
-            $tagIds = $this->getTagIds($tags);
-
-            $post = Post::create($data);
-            $post->tags()->attach($tagIds);
+            $post = $this->repository->createWithRelations([
+                'title' => $data['title'],
+                'content' => $data['content'],
+                'image' => $data['image'] ?? null,
+                'category_id' => $categoryId,
+                'tags' => $tagIds
+            ]);
 
             DB::commit();
+            return $post;
 
-        } catch (\Exception $exception) {
+        } catch (\Exception $e) {
             DB::rollBack();
-            return $exception->getMessage();
+            Log::error('Post creation failed', [
+                'error' => $e->getMessage(),
+                'data' => $data
+            ]);
+            throw new \Exception('Failed to create post', 0, $e);
         }
-
     }
 
-    public function update($post, $data)
+    /**
+     * Обновляет существующий пост
+     *
+     * @param Post $post
+     * @param array $data
+     * @return Post
+     * @throws \Exception
+     */
+    public function update(Post $post, array $data): Post
     {
+        $this->validate($data, $post);
+
         try {
             DB::beginTransaction();
-            $tags = $data['tags'];
-            $category = $data['category'];
-            unset($data['tags'], $data['category']);
 
-            $tagIds = $this->getTagIdsWithUpdate($tags);
-            $data['category_id'] = $this->getCategoryIdWithUpdate($category);
+            $updateData = [
+                'title' => $data['title'],
+                'content' => $data['content'],
+                'image' => $data['image'] ?? null,
+            ];
 
-            $post->update($data);
-            $post->tags()->sync($tagIds);
-
-            DB::commit();
-        } catch (\Exception $exception) {
-            DB::rollBack();
-            return $exception->getMessage();
-        }
-        return $post->fresh();
-
-    }
-
-
-    private function getTagIds($tags)
-    {
-        $tagIds = [];
-        foreach ($tags as $tag) {
-            $tag = !isset($tag['id']) ? Tag::create($tag) : Tag::find($tag['id']);
-            $tagIds[] = $tag->id;
-        }
-
-        return $tagIds;
-
-    }
-
-    private function getTagIdsWithUpdate($tags)
-    {
-        $tagIds = [];
-        foreach ($tags as $tag) {
-            if (!isset($tag['id'])) {
-                $tag = Tag::create($tag);
-            } else {
-                $currentTag = Tag::find($tag['id']);
-
-                $currentTag->update($tag);
-                $tag = $currentTag->refresh();
+            if (isset($data['category'])) {
+                $updateData['category_id'] = $this->getCategoryIdWithUpdate($data['category']);
             }
-            $tagIds[] = $tag->id;
+
+            $post = $this->repository->update($post, $updateData);
+
+            if (isset($data['tags'])) {
+                $tagIds = $this->getTagIdsWithUpdate($data['tags']);
+                $post->tags()->sync($tagIds);
+            }
+
+            DB::commit();
+            return $post->load('tags');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Post update failed', [
+                'error' => $e->getMessage(),
+                'post_id' => $post->id,
+                'data' => $data
+            ]);
+            throw new \Exception('Failed to update post', 0, $e);
+        }
+    }
+
+    private function validate(array $data, ?Post $post = null): void
+    {
+        $rules = [
+            'title' => 'required|string|min:1',
+            'content' => 'required|string',
+            'image' => 'nullable|string',
+            'category' => 'nullable|array',
+            'category.id' => 'nullable|exists:categories,id',
+            'category.title' => 'required_without:category.id|string|min:1',
+            'tags' => 'nullable|array',
+            'tags.*.id' => 'nullable|exists:tags,id',
+            'tags.*.title' => 'required_without:tags.*.id|string|min:1'
+        ];
+
+        $validator = Validator::make($data, $rules);
+
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+    }
+
+    /**
+     * Получает или создает теги
+     *
+     * @param array $tags
+     * @return array
+     */
+    private function getTagIds(array $tags): array
+    {
+        $tagIds = [];
+        foreach ($tags as $tag) {
+            $tagModel = !isset($tag['id']) 
+                ? Tag::create($tag) 
+                : Tag::findOrFail($tag['id']);
+            
+            $tagIds[] = $tagModel->id;
         }
 
         return $tagIds;
-
     }
 
-    private function getCategoryIdWithUpdate($item)
+    /**
+     * Получает или обновляет теги
+     *
+     * @param array $tags
+     * @return array
+     */
+    private function getTagIdsWithUpdate(array $tags): array
     {
+        if (empty($tags)) {
+            return [];
+        }
+
+        $tagIds = [];
+        foreach ($tags as $tag) {
+            if (isset($tag['id'])) {
+                $tagIds[] = $tag['id'];
+            } else {
+                $newTag = Tag::create(['title' => $tag['title']]);
+                $tagIds[] = $newTag->id;
+            }
+        }
+
+        return $tagIds;
+    }
+
+    /**
+     * Получает или обновляет категорию
+     *
+     * @param array|null $item
+     * @return int|null
+     */
+    private function getCategoryIdWithUpdate(?array $item): ?int
+    {
+        if (!$item) {
+            return null;
+        }
+
         if (!isset($item['id'])) {
             $category = Category::create($item);
         } else {
-            $category = Category::find($item['id']);
+            $category = Category::findOrFail($item['id']);
             $category->update($item);
-            $category = $category->refresh();
+            $category = $category->fresh();
         }
 
         return $category->id;
     }
 
-    private function getCategoryId($item)
+    /**
+     * Получает или создает категорию
+     *
+     * @param array|null $item
+     * @return int|null
+     */
+    private function getCategoryId(?array $item): ?int
     {
+        if (!$item) {
+            return null;
+        }
 
-        $category = !isset($item['id']) ? Category::create($item) : Category::find($item['id']);
+        if (!isset($item['id'])) {
+            $category = Category::create($item);
+        } else {
+            $category = Category::findOrFail($item['id']);
+        }
+
         return $category->id;
     }
 }
