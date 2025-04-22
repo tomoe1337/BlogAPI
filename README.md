@@ -30,8 +30,8 @@
 
 1. Клонируйте репозиторий:
 ```bash
-git clone https://github.com/your-username/blog-api.git
-cd blog-api
+git clone https://github.com/tomoe1337/BlogAPI
+cd BlogAPI
 ```
 
 2. Установите зависимости:
